@@ -14,6 +14,10 @@ interface Alert {
   volume: number
   status: "active" | "resolved"
   timestamp: string
+  resolved?: boolean
+  resolutionComment?: string
+  severity?: number
+  message?: string
 }
 
 export default function AlertsPage() {
@@ -27,6 +31,10 @@ export default function AlertsPage() {
       volume: 523,
       status: "active",
       timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      resolved: false,
+      severity: 0.78,
+      message:
+        "Users are reporting that the battery drains significantly faster than competitors. Multiple reports indicate the battery life dropped by 30% compared to the previous model.",
     },
     {
       id: "2",
@@ -35,6 +43,10 @@ export default function AlertsPage() {
       volume: 1203,
       status: "active",
       timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+      resolved: false,
+      severity: 0.35,
+      message:
+        "Overwhelmingly positive feedback about the redesigned user interface. Users appreciate the intuitive navigation and improved accessibility features.",
     },
     {
       id: "3",
@@ -43,6 +55,11 @@ export default function AlertsPage() {
       volume: 324,
       status: "resolved",
       timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      resolved: true,
+      resolutionComment: "Adjusted pricing tiers based on customer feedback",
+      severity: 0.62,
+      message:
+        "Initial concerns about pricing structure were raised by enterprise customers. We introduced more flexible pricing plans.",
     },
   ])
 
@@ -52,6 +69,17 @@ export default function AlertsPage() {
   const handleSuggestMitigation = (alert: Alert) => {
     setSelectedAlert(alert)
     setShowModal(true)
+  }
+
+  const handleMarkResolved = (alertId: string, comment: string) => {
+    setAlerts(
+      alerts.map((alert) =>
+        alert.id === alertId
+          ? { ...alert, resolved: true, resolutionComment: comment, status: "resolved" as const }
+          : alert,
+      ),
+    )
+    setSelectedAlert(null)
   }
 
   return (
@@ -70,7 +98,12 @@ export default function AlertsPage() {
 
         <AlertsFeed alerts={alerts} onSuggestMitigation={handleSuggestMitigation} />
 
-        <AIModal alert={selectedAlert} open={showModal} onOpenChange={setShowModal} />
+        <AIModal
+          alert={selectedAlert}
+          open={showModal}
+          onOpenChange={setShowModal}
+          onMarkResolved={handleMarkResolved}
+        />
       </div>
     </div>
   )

@@ -12,15 +12,38 @@ interface Product {
   name: string
   brand: string
   launchDate: string
+  description: string
+  category: string
 }
 
 export default function ProductsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const { isDarkMode, setIsDarkMode } = useDarkMode()
   const [products, setProducts] = useState<Product[]>([
-    { id: "1", name: "EcoPhone X", brand: "TechCorp", launchDate: "2024-01-15" },
-    { id: "2", name: "SmartWatch Pro", brand: "TechCorp", launchDate: "2024-02-20" },
-    { id: "3", name: "CloudSync", brand: "DataFlow", launchDate: "2024-03-10" },
+    {
+      id: "1",
+      name: "EcoPhone X",
+      brand: "TechCorp",
+      launchDate: "2024-01-15",
+      description: "Eco-friendly smartphone with sustainable materials",
+      category: "Electronics",
+    },
+    {
+      id: "2",
+      name: "SmartWatch Pro",
+      brand: "TechCorp",
+      launchDate: "2024-02-20",
+      description: "Advanced fitness tracking smartwatch",
+      category: "Electronics",
+    },
+    {
+      id: "3",
+      name: "CloudSync",
+      brand: "DataFlow",
+      launchDate: "2024-03-10",
+      description: "Cloud synchronization platform for teams",
+      category: "SaaS",
+    },
   ])
 
   const handleAddProduct = (product: Omit<Product, "id">) => {

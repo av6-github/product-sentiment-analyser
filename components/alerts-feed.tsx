@@ -12,6 +12,8 @@ interface Alert {
   volume: number
   status: "active" | "resolved"
   timestamp: string
+  severity?: number
+  message?: string
 }
 
 interface AlertsFeedProps {
@@ -29,6 +31,13 @@ export default function AlertsFeed({ alerts, onSuggestMitigation }: AlertsFeedPr
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
     return `${Math.floor(seconds / 86400)}d ago`
+  }
+
+  const getSeverityColor = (severity: number) => {
+    if (severity >= 0.8) return "bg-red-100 text-red-700"
+    if (severity >= 0.6) return "bg-orange-100 text-orange-700"
+    if (severity >= 0.4) return "bg-yellow-100 text-yellow-700"
+    return "bg-blue-100 text-blue-700"
   }
 
   return (
@@ -49,7 +58,18 @@ export default function AlertsFeed({ alerts, onSuggestMitigation }: AlertsFeedPr
                     {alert.status === "active" ? "Active" : "Resolved"}
                   </Badge>
                 </div>
-                <p className="text-muted-foreground mb-3">{alert.sentiment}</p>
+
+                <p className="text-muted-foreground mb-2">{alert.sentiment}</p>
+                {alert.message && <p className="text-sm text-muted-foreground mb-3">{alert.message}</p>}
+
+                {alert.severity !== undefined && (
+                  <div className="mb-3">
+                    <Badge className={getSeverityColor(alert.severity)}>
+                      Severity: {(alert.severity * 100).toFixed(0)}%
+                    </Badge>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-4 text-sm">
                   <span className="text-muted-foreground">{alert.volume.toLocaleString()} mentions</span>
                   <span className="text-muted-foreground">{getTimeAgo(alert.timestamp)}</span>

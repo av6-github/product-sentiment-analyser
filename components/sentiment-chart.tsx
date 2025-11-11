@@ -135,9 +135,9 @@ export default function SentimentChart({ selectedProduct, selectedTimePeriod }: 
             <YAxis />
             <Tooltip />
             <Legend />
-            <Line type="monotone" dataKey="positive" stroke="#16a34a" strokeWidth={2} name="Positive" />
-            <Line type="monotone" dataKey="neutral" stroke="#6b7280" strokeWidth={2} name="Neutral" />
-            <Line type="monotone" dataKey="negative" stroke="#dc2626" strokeWidth={2} name="Negative" />
+            <Line type="monotone" dataKey="positive" stroke="#40798c" strokeWidth={2} name="Positive" />
+            <Line type="monotone" dataKey="neutral" stroke="#70a9a1" strokeWidth={2} name="Neutral" />
+            <Line type="monotone" dataKey="negative" stroke="#0b2027" strokeWidth={2} name="Negative" />
           </LineChart>
         </ResponsiveContainer>
       </CardContent>

@@ -41,6 +41,14 @@ export default function EmotionChart({ selectedProduct = "all" }: EmotionChartPr
 
   const data = emotionData[selectedProduct] || emotionData.all
 
+  const emotionColors: Record<string, string> = {
+    Happy: "#40798c", // Updated to Cerulean
+    Excited: "#70a9a1", // Updated to Verdigris
+    Neutral: "#cfd7c7", // Updated to Ash gray
+    Frustrated: "#0b2027", // Updated to Rich black
+    Angry: "#1b2432", // Updated to Gunmetal
+  }
+
   return (
     <Card className="shadow-md border-0 bg-card hover:shadow-lg transition-shadow">
       <CardHeader className="pb-3">
@@ -61,22 +69,7 @@ export default function EmotionChart({ selectedProduct = "all" }: EmotionChartPr
               paddingAngle={2}
             >
               {data.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={
-                    entry.name === "Happy"
-                      ? "#3b82f6"
-                      : entry.name === "Excited"
-                        ? "#a855f7"
-                        : entry.name === "Frustrated"
-                          ? "#f59e0b"
-                          : entry.name === "Neutral"
-                            ? "#6366f1"
-                            : entry.name === "Angry"
-                              ? "#dc2626"
-                              : "#8884d8"
-                  }
-                />
+                <Cell key={`cell-${index}`} fill={emotionColors[entry.name] || "#8884d8"} />
               ))}
             </Pie>
             <Tooltip formatter={(value) => `${value}%`} />

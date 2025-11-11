@@ -54,9 +54,9 @@ export default function Home() {
         </div>
 
         <div ref={buttonRef} className="flex gap-4 justify-center">
-          <Link href="/dashboard">
+          <Link href="/auth">
             <Button size="lg" className="gap-2">
-              Enter Dashboard
+              Get Started
               <ArrowRight className="w-4 h-4" />
             </Button>
           </Link>
