@@ -1,6 +1,5 @@
 "use client"
 
-import type React from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,11 +25,22 @@ export default function AuthPage() {
     setLoading(true)
     setError(null)
 
-    try {
-      const supabase = createClient()
+    const supabase = createClient()
 
+    try {
       if (isSignUp) {
-        // Create brand in brand table
+        // 1️⃣ Create Supabase Auth user
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+        })
+
+        if (authError) throw new Error("Signup failed: " + authError.message)
+
+        const user = authData?.user
+        if (!user) throw new Error("No user returned from signup")
+
+        // 2️⃣ Insert into brand table with user_id link
         const { data: brandData, error: brandError } = await supabase
           .from("brand")
           .insert([
@@ -38,13 +48,14 @@ export default function AuthPage() {
               brand_name: brandName,
               industry: industry,
               website: websiteUrl,
+              user_id: user.id, // link to auth.users
             },
           ])
           .select()
 
         if (brandError) throw new Error("Failed to create brand: " + brandError.message)
 
-        // Store brand info for later use
+        // 3️⃣ Store brand info locally for dashboard use
         localStorage.setItem(
           "brandInfo",
           JSON.stringify({
@@ -52,36 +63,47 @@ export default function AuthPage() {
             industry,
             websiteUrl,
             brandId: brandData?.[0]?.brand_id,
-          }),
+            userId: user.id,
+          })
         )
 
         router.push("/dashboard")
       } else {
-        // Login - just verify and store brand info
-        const { data: brands, error: queryError } = await supabase
+        // 4️⃣ Login user via Supabase Auth
+        const { data: authData, error: loginError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+
+        if (loginError) throw new Error("Login failed: " + loginError.message)
+
+        const user = authData?.user
+        if (!user) throw new Error("No user returned from login")
+
+        // 5️⃣ Fetch brand linked to this user
+        const { data: brand, error: brandFetchError } = await supabase
           .from("brand")
           .select("*")
-          .eq("brand_name", email.split("@")[0])
+          .eq("user_id", user.id)
+          .single()
 
-        if (queryError) throw new Error("Login failed")
+        if (brandFetchError || !brand) throw new Error("No brand linked to this account")
 
-        if (brands && brands.length > 0) {
-          const brand = brands[0]
-          localStorage.setItem(
-            "brandInfo",
-            JSON.stringify({
-              brandName: brand.brand_name,
-              industry: brand.industry,
-              websiteUrl: brand.website,
-              brandId: brand.brand_id,
-            }),
-          )
-          router.push("/dashboard")
-        } else {
-          setError("Brand not found")
-        }
+        localStorage.setItem(
+          "brandInfo",
+          JSON.stringify({
+            brandName: brand.brand_name,
+            industry: brand.industry,
+            websiteUrl: brand.website,
+            brandId: brand.brand_id,
+            userId: user.id,
+          })
+        )
+
+        router.push("/dashboard")
       }
     } catch (err) {
+      console.error(err)
       setError(err instanceof Error ? err.message : "An error occurred")
     } finally {
       setLoading(false)

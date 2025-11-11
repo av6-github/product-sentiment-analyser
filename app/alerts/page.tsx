@@ -28,13 +28,57 @@ export default function AlertsPage() {
   const [loading, setLoading] = useState(true)
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null)
   const [showModal, setShowModal] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const supabase = createClient()
 
   useEffect(() => {
     const fetchAlerts = async () => {
       try {
-        const supabase = createClient()
+        setLoading(true)
+        setError(null)
 
-        const { data: alertsData, error } = await supabase
+        // 1️⃣ Get current logged-in user
+        const { data: userData, error: userError } = await supabase.auth.getUser()
+        if (userError || !userData.user) {
+          setError("Please log in to view alerts.")
+          return
+        }
+        const userId = userData.user.id
+
+        // 2️⃣ Find this user's brand
+        const { data: brandData, error: brandError } = await supabase
+          .from("brand")
+          .select("brand_id")
+          .eq("user_id", userId)
+          .single()
+
+        if (brandError || !brandData) {
+          setError("No brand linked to this account.")
+          return
+        }
+
+        const brandId = brandData.brand_id
+
+        // 3️⃣ Fetch all product IDs for this brand
+        const { data: productData, error: productError } = await supabase
+          .from("product")
+          .select("product_id")
+          .eq("brand_id", brandId)
+
+        if (productError || !productData) {
+          setError("No products found for this brand.")
+          return
+        }
+
+        const productIds = productData.map((p) => p.product_id)
+        if (productIds.length === 0) {
+          setAlerts([])
+          return
+        }
+
+        // 4️⃣ Fetch alerts for posts linked to those products
+        const { data: alertsData, error: alertsError } = await supabase
           .from("alert")
           .select(
             `
@@ -49,17 +93,25 @@ export default function AlertsPage() {
             post:post_id (
               post_products (
                 product:product_id (
+                  product_id,
                   product_name
                 )
               )
             )
-          `,
+          `
           )
           .order("triggered_at", { ascending: false })
 
-        if (error) throw error
+        if (alertsError) throw alertsError
 
-        const formattedAlerts: Alert[] = (alertsData || []).map((alert: any) => {
+        // 5️⃣ Filter alerts by brand’s product IDs
+        const filteredAlerts = (alertsData || []).filter((alert: any) => {
+          const prodId = alert.post?.post_products?.[0]?.product?.product_id
+          return productIds.includes(prodId)
+        })
+
+        // 6️⃣ Format alerts for UI
+        const formattedAlerts: Alert[] = filteredAlerts.map((alert: any) => {
           const productName = alert.post?.post_products?.[0]?.product?.product_name || "Unknown Product"
           return {
             id: alert.alert_id.toString(),
@@ -78,6 +130,7 @@ export default function AlertsPage() {
         setAlerts(formattedAlerts)
       } catch (error) {
         console.error("Error fetching alerts:", error)
+        setError("Error loading alerts.")
       } finally {
         setLoading(false)
       }
@@ -93,8 +146,6 @@ export default function AlertsPage() {
 
   const handleMarkResolved = async (alertId: string, comment: string) => {
     try {
-      const supabase = createClient()
-
       const { error } = await supabase
         .from("alert")
         .update({
@@ -109,8 +160,8 @@ export default function AlertsPage() {
         alerts.map((alert) =>
           alert.id === alertId
             ? { ...alert, resolved: true, resolutionComment: comment, status: "resolved" as const }
-            : alert,
-        ),
+            : alert
+        )
       )
       setSelectedAlert(null)
     } catch (error) {
@@ -126,13 +177,22 @@ export default function AlertsPage() {
         isDarkMode={isDarkMode}
         setIsDarkMode={setIsDarkMode}
       />
+
       <div className="flex-1 p-8 space-y-8">
         <div className="flex items-center gap-3">
           <AlertCircle className="w-8 h-8 text-primary" />
           <h1 className="text-3xl font-bold">Sentiment Alerts</h1>
         </div>
 
-        <AlertsFeed alerts={alerts} onSuggestMitigation={handleSuggestMitigation} />
+        {loading ? (
+          <p>Loading alerts...</p>
+        ) : error ? (
+          <p className="text-red-500">{error}</p>
+        ) : alerts.length === 0 ? (
+          <p className="text-muted-foreground">No alerts found for your brand.</p>
+        ) : (
+          <AlertsFeed alerts={alerts} onSuggestMitigation={handleSuggestMitigation} />
+        )}
 
         <AIModal
           alert={selectedAlert}

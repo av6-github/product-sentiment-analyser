@@ -7,6 +7,7 @@ import { Loader2, Lightbulb, X, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import { GoogleGenerativeAI } from "@google/generative-ai"
 
 interface Alert {
   id: string
@@ -28,6 +29,9 @@ interface AIModalProps {
   onMarkResolved?: (alertId: string, comment: string) => void
 }
 
+// 🔹 Initialize Gemini client
+const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || "")
+
 export default function AIModal({ alert, open, onOpenChange, onMarkResolved }: AIModalProps) {
   const [loading, setLoading] = useState(false)
   const [recommendations, setRecommendations] = useState<string[]>([])
@@ -35,21 +39,51 @@ export default function AIModal({ alert, open, onOpenChange, onMarkResolved }: A
   const [resolutionComment, setResolutionComment] = useState("")
 
   useEffect(() => {
-    if (open && alert) {
+    const fetchRecommendations = async () => {
+      if (!alert) return
       setLoading(true)
       setRecommendations([])
-      setResolutionComment("")
-      setIsMarking(false)
-      // Simulate AI generation with delay
-      setTimeout(() => {
+
+      try {
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" })
+        const prompt = `
+          You are a social media brand reputation assistant.
+          A brand has received a sentiment alert.
+
+          Product: ${alert.product}
+          Sentiment type: ${alert.sentiment}
+          Alert message: ${alert.message || "No additional message"}
+          Mentions detected: ${alert.volume}
+
+          Suggest 3–4 short, actionable recommendations
+          to mitigate this issue or improve public sentiment.
+          Output only bullet points or short actionable lines.
+        `
+        const result = await model.generateContent(prompt)
+        const responseText = result.response.text()
+
+        // Split Gemini's text output into actionable lines
+        const recs = responseText
+          .split(/\n+/)
+          .map((r) => r.replace(/^[-*•\d.]\s*/, "").trim())
+          .filter((r) => r.length > 0)
+
+        setRecommendations(recs.slice(0, 4)) // Limit to top 4
+      } catch (err) {
+        console.error("Gemini Error:", err)
         setRecommendations([
-          `Launch a social media campaign addressing "${alert.sentiment}" with customer testimonials`,
-          `Create a FAQ post addressing the top ${alert.volume} mentions from recent discussions`,
-          "Email existing customers with troubleshooting guide or product update announcement",
-          "Engage directly with top influencers discussing this topic to shape narrative",
+          "Acknowledge customer feedback with an empathetic social media post.",
+          "Engage key influencers to share positive experiences.",
+          "Address customer concerns directly in replies.",
+          "Publish an update or fix announcement to rebuild trust.",
         ])
+      } finally {
         setLoading(false)
-      }, 2000)
+      }
+    }
+
+    if (open && alert && !alert.resolved) {
+      fetchRecommendations()
     }
   }, [open, alert])
 
@@ -75,15 +109,25 @@ export default function AIModal({ alert, open, onOpenChange, onMarkResolved }: A
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col" onPointerDownOutside={(e) => e.preventDefault()}>
+      <DialogContent
+        className="max-w-2xl max-h-[90vh] flex flex-col"
+        onPointerDownOutside={(e) => e.preventDefault()}
+      >
         <div className="flex items-center justify-between">
           <div>
-            <DialogTitle>Alert Management</DialogTitle>
+            <DialogTitle>AI-Powered Alert Management</DialogTitle>
             <DialogDescription>
-              {alert.status === "active" ? "View recommendations or mark as resolved" : "View resolved alert details"}
+              {alert.status === "active"
+                ? "View Gemini-generated recommendations or mark as resolved"
+                : "View resolved alert details"}
             </DialogDescription>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="h-8 w-8 p-0 flex-shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onOpenChange(false)}
+            className="h-8 w-8 p-0 flex-shrink-0"
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -115,21 +159,25 @@ export default function AIModal({ alert, open, onOpenChange, onMarkResolved }: A
                 </div>
               )}
 
-              {alert.message && <p className="text-sm text-muted-foreground">{alert.message}</p>}
+              {alert.message && (
+                <p className="text-sm text-muted-foreground">{alert.message}</p>
+              )}
             </CardContent>
           </Card>
 
           {!alert.resolved && loading && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              <span className="ml-2 text-muted-foreground">Generating recommendations...</span>
+              <span className="ml-2 text-muted-foreground">
+                Asking Gemini for recommendations...
+              </span>
             </div>
           )}
 
-          {!alert.resolved && !loading && (
+          {!alert.resolved && !loading && recommendations.length > 0 && (
             <>
               <div className="space-y-3">
-                <h3 className="font-semibold text-sm">Recommended Actions</h3>
+                <h3 className="font-semibold text-sm">AI Recommended Actions</h3>
                 {recommendations.map((rec, index) => (
                   <Card key={index}>
                     <CardContent className="pt-6">
@@ -145,7 +193,9 @@ export default function AIModal({ alert, open, onOpenChange, onMarkResolved }: A
               <div className="space-y-3 border-t pt-4">
                 <h3 className="font-semibold text-sm">Mark as Resolved</h3>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">How was this alert resolved?</label>
+                  <label className="text-sm font-medium">
+                    How was this alert resolved?
+                  </label>
                   <Textarea
                     placeholder="Describe how you resolved this sentiment issue..."
                     value={resolutionComment}
@@ -172,7 +222,9 @@ export default function AIModal({ alert, open, onOpenChange, onMarkResolved }: A
                   <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-1" />
                   <div className="flex-1">
                     <p className="font-semibold text-green-900">Resolved</p>
-                    <p className="text-sm text-green-800 mt-2">{alert.resolutionComment}</p>
+                    <p className="text-sm text-green-800 mt-2">
+                      {alert.resolutionComment}
+                    </p>
                   </div>
                 </div>
               </CardContent>
