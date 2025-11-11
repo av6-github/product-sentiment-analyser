@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import AlertsFeed from "@/components/alerts-feed"
 import AIModal from "@/components/ai-mitigation-modal"
 import Sidebar from "@/components/sidebar"
 import { useDarkMode } from "@/app/client-layout"
 import { AlertCircle } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
 interface Alert {
   id: string
@@ -23,63 +24,98 @@ interface Alert {
 export default function AlertsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const { isDarkMode, setIsDarkMode } = useDarkMode()
-  const [alerts, setAlerts] = useState<Alert[]>([
-    {
-      id: "1",
-      product: "EcoPhone X",
-      sentiment: "Battery life concerns growing",
-      volume: 523,
-      status: "active",
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      resolved: false,
-      severity: 0.78,
-      message:
-        "Users are reporting that the battery drains significantly faster than competitors. Multiple reports indicate the battery life dropped by 30% compared to the previous model.",
-    },
-    {
-      id: "2",
-      product: "SmartWatch Pro",
-      sentiment: "Users love the new interface",
-      volume: 1203,
-      status: "active",
-      timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-      resolved: false,
-      severity: 0.35,
-      message:
-        "Overwhelmingly positive feedback about the redesigned user interface. Users appreciate the intuitive navigation and improved accessibility features.",
-    },
-    {
-      id: "3",
-      product: "CloudSync",
-      sentiment: "Pricing concerns addressed",
-      volume: 324,
-      status: "resolved",
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      resolved: true,
-      resolutionComment: "Adjusted pricing tiers based on customer feedback",
-      severity: 0.62,
-      message:
-        "Initial concerns about pricing structure were raised by enterprise customers. We introduced more flexible pricing plans.",
-    },
-  ])
-
+  const [alerts, setAlerts] = useState<Alert[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null)
   const [showModal, setShowModal] = useState(false)
+
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        const supabase = createClient()
+
+        const { data: alertsData, error } = await supabase
+          .from("ALERT")
+          .select(
+            `
+            alert_id,
+            alert_type,
+            post_id,
+            triggered_at,
+            is_resolved,
+            alert_severity,
+            alert_message,
+            resolve_message,
+            POST:post_id (
+              POST_PRODUCTS (
+                PRODUCT:product_id (
+                  product_name
+                )
+              )
+            )
+          `,
+          )
+          .order("triggered_at", { ascending: false })
+
+        if (error) throw error
+
+        const formattedAlerts: Alert[] = (alertsData || []).map((alert: any) => {
+          const productName = alert.POST?.POST_PRODUCTS?.[0]?.PRODUCT?.product_name || "Unknown Product"
+          return {
+            id: alert.alert_id.toString(),
+            product: productName,
+            sentiment: alert.alert_type,
+            volume: 0,
+            status: alert.is_resolved ? "resolved" : "active",
+            timestamp: alert.triggered_at,
+            resolved: alert.is_resolved,
+            resolutionComment: alert.resolve_message,
+            severity: alert.alert_severity / 100,
+            message: alert.alert_message,
+          }
+        })
+
+        setAlerts(formattedAlerts)
+      } catch (error) {
+        console.error("Error fetching alerts:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAlerts()
+  }, [])
 
   const handleSuggestMitigation = (alert: Alert) => {
     setSelectedAlert(alert)
     setShowModal(true)
   }
 
-  const handleMarkResolved = (alertId: string, comment: string) => {
-    setAlerts(
-      alerts.map((alert) =>
-        alert.id === alertId
-          ? { ...alert, resolved: true, resolutionComment: comment, status: "resolved" as const }
-          : alert,
-      ),
-    )
-    setSelectedAlert(null)
+  const handleMarkResolved = async (alertId: string, comment: string) => {
+    try {
+      const supabase = createClient()
+
+      const { error } = await supabase
+        .from("ALERT")
+        .update({
+          is_resolved: true,
+          resolve_message: comment,
+        })
+        .eq("alert_id", Number.parseInt(alertId))
+
+      if (error) throw error
+
+      setAlerts(
+        alerts.map((alert) =>
+          alert.id === alertId
+            ? { ...alert, resolved: true, resolutionComment: comment, status: "resolved" as const }
+            : alert,
+        ),
+      )
+      setSelectedAlert(null)
+    } catch (error) {
+      console.error("Error updating alert:", error)
+    }
   }
 
   return (

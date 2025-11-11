@@ -1,12 +1,13 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChart3, ArrowRight } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
 
 export default function AuthPage() {
   const [isSignUp, setIsSignUp] = useState(false)
@@ -17,25 +18,74 @@ export default function AuthPage() {
   const [industry, setIndustry] = useState("")
   const [websiteUrl, setWebsiteUrl] = useState("")
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    if (isSignUp && brandName && industry && websiteUrl) {
-      localStorage.setItem(
-        "brandInfo",
-        JSON.stringify({
-          brandName,
-          industry,
-          websiteUrl,
-        }),
-      )
-    }
-    // Simulate auth delay
-    setTimeout(() => {
+    setError(null)
+
+    try {
+      const supabase = createClient()
+
+      if (isSignUp) {
+        // Create brand in BRAND table
+        const { data: brandData, error: brandError } = await supabase
+          .from("BRAND")
+          .insert([
+            {
+              brand_name: brandName,
+              industry: industry,
+              website: websiteUrl,
+            },
+          ])
+          .select()brand
+
+        if (brandError) throw new Error("Failed to create brand: " + brandError.message)
+
+        // Store brand info for later use
+        localStorage.setItem(
+          "brandInfo",
+          JSON.stringify({
+            brandName,
+            industry,
+            websiteUrl,
+            brandId: brandData?.[0]?.brand_id,
+          }),
+        )
+
+        router.push("/dashboard")
+      } else {
+        // Login - just verify and store brand info
+        const { data: brands, error: queryError } = await supabase
+          .from("BRAND")
+          .select("*")
+          .eq("brand_name", email.split("@")[0])
+
+        if (queryError) throw new Error("Login failed")
+
+        if (brands && brands.length > 0) {
+          const brand = brands[0]
+          localStorage.setItem(
+            "brandInfo",
+            JSON.stringify({
+              brandName: brand.brand_name,
+              industry: brand.industry,
+              websiteUrl: brand.website,
+              brandId: brand.brand_id,
+            }),
+          )
+          router.push("/dashboard")
+        } else {
+          setError("Brand not found")
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred")
+    } finally {
       setLoading(false)
-      window.location.href = "/dashboard"
-    }, 1500)
+    }
   }
 
   return (
@@ -127,6 +177,8 @@ export default function AuthPage() {
                 />
               </div>
 
+              {error && <p className="text-sm text-red-500">{error}</p>}
+
               <Button type="submit" className="w-full gap-2" disabled={loading}>
                 {loading ? "Processing..." : isSignUp ? "Create Account" : "Sign In"}
                 <ArrowRight className="w-4 h-4" />
@@ -148,6 +200,7 @@ export default function AuthPage() {
                   setWebsiteUrl("")
                   setEmail("")
                   setPassword("")
+                  setError(null)
                 }}
               >
                 {isSignUp ? "Sign In" : "Create Account"}
@@ -155,10 +208,6 @@ export default function AuthPage() {
             </div>
           </CardContent>
         </Card>
-
-        <p className="text-center text-sm text-muted-foreground mt-6">
-          Demo: Enter any credentials to access the dashboard
-        </p>
       </div>
     </div>
   )

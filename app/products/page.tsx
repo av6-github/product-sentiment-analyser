@@ -1,17 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import AddProductForm from "@/components/add-product-form"
 import ProductsTable from "@/components/products-table"
 import Sidebar from "@/components/sidebar"
 import { useDarkMode } from "@/app/client-layout"
 import { Package } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
 interface Product {
-  id: string
-  name: string
-  brand: string
-  launchDate: string
+  product_id: string
+  product_name: string
+  brand_id: string
+  launch_date: string
   description: string
   category: string
 }
@@ -19,39 +20,69 @@ interface Product {
 export default function ProductsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const { isDarkMode, setIsDarkMode } = useDarkMode()
-  const [products, setProducts] = useState<Product[]>([
-    {
-      id: "1",
-      name: "EcoPhone X",
-      brand: "TechCorp",
-      launchDate: "2024-01-15",
-      description: "Eco-friendly smartphone with sustainable materials",
-      category: "Electronics",
-    },
-    {
-      id: "2",
-      name: "SmartWatch Pro",
-      brand: "TechCorp",
-      launchDate: "2024-02-20",
-      description: "Advanced fitness tracking smartwatch",
-      category: "Electronics",
-    },
-    {
-      id: "3",
-      name: "CloudSync",
-      brand: "DataFlow",
-      launchDate: "2024-03-10",
-      description: "Cloud synchronization platform for teams",
-      category: "SaaS",
-    },
-  ])
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [brandId, setBrandId] = useState<string | null>(null)
 
-  const handleAddProduct = (product: Omit<Product, "id">) => {
-    setProducts([...products, { ...product, id: Date.now().toString() }])
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const brandInfo = localStorage.getItem("brandInfo")
+        if (brandInfo) {
+          const { brandId: bid } = JSON.parse(brandInfo)
+          setBrandId(bid)
+
+          const supabase = createClient()
+          const { data, error } = await supabase.from("PRODUCT").select("*").eq("brand_id", bid)
+
+          if (error) throw error
+          setProducts(data || [])
+        }
+      } catch (error) {
+        console.error("Error fetching products:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProducts()
+  }, [])
+
+  const handleAddProduct = async (product: Omit<Product, "product_id" | "brand_id">) => {
+    try {
+      if (!brandId) return
+
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("PRODUCT")
+        .insert([
+          {
+            product_name: product.product_name,
+            brand_id: brandId,
+            launch_date: product.launch_date,
+            description: product.description,
+            category: product.category,
+          },
+        ])
+        .select()
+
+      if (error) throw error
+      setProducts([...products, ...(data || [])])
+    } catch (error) {
+      console.error("Error adding product:", error)
+    }
   }
 
-  const handleDeleteProduct = (id: string) => {
-    setProducts(products.filter((p) => p.id !== id))
+  const handleDeleteProduct = async (id: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("PRODUCT").delete().eq("product_id", id)
+
+      if (error) throw error
+      setProducts(products.filter((p) => p.product_id !== id))
+    } catch (error) {
+      console.error("Error deleting product:", error)
+    }
   }
 
   return (
@@ -73,7 +104,17 @@ export default function ProductsPage() {
             <AddProductForm onAddProduct={handleAddProduct} />
           </div>
           <div className="lg:col-span-2">
-            <ProductsTable products={products} onDeleteProduct={handleDeleteProduct} />
+            <ProductsTable
+              products={products.map((p) => ({
+                id: p.product_id.toString(),
+                name: p.product_name,
+                brand: "",
+                launchDate: p.launch_date,
+                description: p.description,
+                category: p.category,
+              }))}
+              onDeleteProduct={handleDeleteProduct}
+            />
           </div>
         </div>
       </div>

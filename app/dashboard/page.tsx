@@ -1,161 +1,83 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import KPICard from "@/components/kpi-card"
 import SentimentChart from "@/components/sentiment-chart"
 import EmotionChart from "@/components/emotion-chart"
 import { TrendingUp, MessageCircle, Heart, AlertCircle } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { createClient } from "@/lib/supabase/client"
+
+interface KPI {
+  title: string
+  value: string
+  change: string
+  icon: any
+  trend: "up" | "down"
+}
 
 export default function Dashboard() {
   const [selectedProduct, setSelectedProduct] = useState("all")
   const [selectedTimePeriod, setSelectedTimePeriod] = useState("lastweek")
+  const [products, setProducts] = useState<any[]>([])
+  const [kpis, setKpis] = useState<KPI[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const productKPIs: Record<string, any[]> = {
-    all: [
-      {
-        title: "Total Posts",
-        value: "12,584",
-        change: "+12.5%",
-        icon: MessageCircle,
-        trend: "up",
-      },
-      {
-        title: "Engagement Rate",
-        value: "8.2%",
-        change: "+2.3%",
-        icon: TrendingUp,
-        trend: "up",
-      },
-      {
-        title: "Positive Sentiment",
-        value: "73%",
-        change: "+5.1%",
-        icon: Heart,
-        trend: "up",
-      },
-      {
-        title: "Active Alerts",
-        value: "3",
-        change: "-1",
-        icon: AlertCircle,
-        trend: "down",
-      },
-    ],
-    ecophone: [
-      {
-        title: "Total Posts",
-        value: "4,230",
-        change: "+8.2%",
-        icon: MessageCircle,
-        trend: "up",
-      },
-      {
-        title: "Engagement Rate",
-        value: "9.1%",
-        change: "+3.2%",
-        icon: TrendingUp,
-        trend: "up",
-      },
-      {
-        title: "Positive Sentiment",
-        value: "68%",
-        change: "-2.1%",
-        icon: Heart,
-        trend: "down",
-      },
-      {
-        title: "Active Alerts",
-        value: "2",
-        change: "+1",
-        icon: AlertCircle,
-        trend: "up",
-      },
-    ],
-    smartwatch: [
-      {
-        title: "Total Posts",
-        value: "5,892",
-        change: "+15.3%",
-        icon: MessageCircle,
-        trend: "up",
-      },
-      {
-        title: "Engagement Rate",
-        value: "10.5%",
-        change: "+4.1%",
-        icon: TrendingUp,
-        trend: "up",
-      },
-      {
-        title: "Positive Sentiment",
-        value: "81%",
-        change: "+8.2%",
-        icon: Heart,
-        trend: "up",
-      },
-      {
-        title: "Active Alerts",
-        value: "1",
-        change: "-2",
-        icon: AlertCircle,
-        trend: "down",
-      },
-    ],
-    cloudsync: [
-      {
-        title: "Total Posts",
-        value: "2,462",
-        change: "+5.7%",
-        icon: MessageCircle,
-        trend: "up",
-      },
-      {
-        title: "Engagement Rate",
-        value: "6.8%",
-        change: "+1.2%",
-        icon: TrendingUp,
-        trend: "up",
-      },
-      {
-        title: "Positive Sentiment",
-        value: "72%",
-        change: "+3.5%",
-        icon: Heart,
-        trend: "up",
-      },
-      {
-        title: "Active Alerts",
-        value: "0",
-        change: "0",
-        icon: AlertCircle,
-        trend: "down",
-      },
-    ],
-  }
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const supabase = createClient()
 
-  const getAdjustedKPIs = () => {
-    const kpis = productKPIs[selectedProduct] || productKPIs.all
+        // Fetch products
+        const { data: productsData } = await supabase.from("PRODUCT").select("*")
+        setProducts(productsData || [])
 
-    // Adjust values based on time period
-    if (selectedTimePeriod === "lastmonth") {
-      return kpis.map((kpi) => ({
-        ...kpi,
-        value:
-          typeof kpi.value === "string" && kpi.value.includes("%") ? Number.parseInt(kpi.value) + 3 + "%" : kpi.value,
-      }))
-    } else if (selectedTimePeriod === "last3months") {
-      return kpis.map((kpi) => ({
-        ...kpi,
-        value:
-          typeof kpi.value === "string" && kpi.value.includes("%") ? Number.parseInt(kpi.value) + 6 + "%" : kpi.value,
-      }))
+        // Fetch KPI data based on product selection
+        const { data: alerts } = await supabase.from("ALERT").select("*")
+        const { data: sentiments } = await supabase.from("SENTIMENT").select("*")
+        const { data: engagements } = await supabase.from("ENGAGEMENT").select("*")
+
+        const kpiData: KPI[] = [
+          {
+            title: "Total Posts",
+            value: (sentiments?.length || 0).toLocaleString(),
+            change: "+12.5%",
+            icon: MessageCircle,
+            trend: "up",
+          },
+          {
+            title: "Engagement Rate",
+            value: "8.2%",
+            change: "+2.3%",
+            icon: TrendingUp,
+            trend: "up",
+          },
+          {
+            title: "Positive Sentiment",
+            value: `${Math.round((sentiments?.filter((s) => s.label === "positive").length || 0 / (sentiments?.length || 1)) * 100)}%`,
+            change: "+5.1%",
+            icon: Heart,
+            trend: "up",
+          },
+          {
+            title: "Active Alerts",
+            value: (alerts?.filter((a) => !a.is_resolved).length || 0).toString(),
+            change: "-1",
+            icon: AlertCircle,
+            trend: "down",
+          },
+        ]
+
+        setKpis(kpiData)
+      } catch (error) {
+        console.error("Error fetching data:", error)
+      } finally {
+        setLoading(false)
+      }
     }
 
-    return kpis
-  }
-
-  const kpis = getAdjustedKPIs()
+    fetchData()
+  }, [selectedProduct, selectedTimePeriod])
 
   return (
     <div className="p-8 space-y-8">
@@ -171,9 +93,11 @@ export default function Dashboard() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Products</SelectItem>
-                <SelectItem value="ecophone">EcoPhone X</SelectItem>
-                <SelectItem value="smartwatch">SmartWatch Pro</SelectItem>
-                <SelectItem value="cloudsync">CloudSync</SelectItem>
+                {products.map((p) => (
+                  <SelectItem key={p.product_id} value={p.product_id.toString()}>
+                    {p.product_name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
