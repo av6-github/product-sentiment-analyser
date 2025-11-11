@@ -33,7 +33,7 @@ export default function ProductsPage() {
           setBrandId(bid)
 
           const supabase = createClient()
-          const { data, error } = await supabase.from("PRODUCT").select("*").eq("brand_id", bid)
+          const { data, error } = await supabase.from("product").select("*").eq("brand_id", bid)
 
           if (error) throw error
           setProducts(data || [])
@@ -54,7 +54,7 @@ export default function ProductsPage() {
 
       const supabase = createClient()
       const { data, error } = await supabase
-        .from("PRODUCT")
+        .from("product")
         .insert([
           {
             product_name: product.product_name,
@@ -76,7 +76,7 @@ export default function ProductsPage() {
   const handleDeleteProduct = async (id: string) => {
     try {
       const supabase = createClient()
-      const { error } = await supabase.from("PRODUCT").delete().eq("product_id", id)
+      const { error } = await supabase.from("product").delete().eq("product_id", id)
 
       if (error) throw error
       setProducts(products.filter((p) => p.product_id !== id))

@@ -35,7 +35,7 @@ export default function AlertsPage() {
         const supabase = createClient()
 
         const { data: alertsData, error } = await supabase
-          .from("ALERT")
+          .from("alert")
           .select(
             `
             alert_id,
@@ -46,9 +46,9 @@ export default function AlertsPage() {
             alert_severity,
             alert_message,
             resolve_message,
-            POST:post_id (
-              POST_PRODUCTS (
-                PRODUCT:product_id (
+            post:post_id (
+              post_products (
+                product:product_id (
                   product_name
                 )
               )
@@ -60,7 +60,7 @@ export default function AlertsPage() {
         if (error) throw error
 
         const formattedAlerts: Alert[] = (alertsData || []).map((alert: any) => {
-          const productName = alert.POST?.POST_PRODUCTS?.[0]?.PRODUCT?.product_name || "Unknown Product"
+          const productName = alert.post?.post_products?.[0]?.product?.product_name || "Unknown Product"
           return {
             id: alert.alert_id.toString(),
             product: productName,
@@ -96,7 +96,7 @@ export default function AlertsPage() {
       const supabase = createClient()
 
       const { error } = await supabase
-        .from("ALERT")
+        .from("alert")
         .update({
           is_resolved: true,
           resolve_message: comment,

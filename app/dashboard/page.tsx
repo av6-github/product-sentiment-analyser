@@ -29,13 +29,13 @@ export default function Dashboard() {
         const supabase = createClient()
 
         // Fetch products
-        const { data: productsData } = await supabase.from("PRODUCT").select("*")
+        const { data: productsData } = await supabase.from("product").select("*")
         setProducts(productsData || [])
 
         // Fetch KPI data based on product selection
-        const { data: alerts } = await supabase.from("ALERT").select("*")
-        const { data: sentiments } = await supabase.from("SENTIMENT").select("*")
-        const { data: engagements } = await supabase.from("ENGAGEMENT").select("*")
+        const { data: alerts } = await supabase.from("alert").select("*")
+        const { data: sentiments } = await supabase.from("sentiment").select("*")
+        const { data: engagements } = await supabase.from("engagement").select("*")
 
         const kpiData: KPI[] = [
           {

@@ -30,9 +30,9 @@ export default function AuthPage() {
       const supabase = createClient()
 
       if (isSignUp) {
-        // Create brand in BRAND table
+        // Create brand in brand table
         const { data: brandData, error: brandError } = await supabase
-          .from("BRAND")
+          .from("brand")
           .insert([
             {
               brand_name: brandName,
@@ -40,7 +40,7 @@ export default function AuthPage() {
               website: websiteUrl,
             },
           ])
-          .select()brand
+          .select()
 
         if (brandError) throw new Error("Failed to create brand: " + brandError.message)
 
@@ -59,7 +59,7 @@ export default function AuthPage() {
       } else {
         // Login - just verify and store brand info
         const { data: brands, error: queryError } = await supabase
-          .from("BRAND")
+          .from("brand")
           .select("*")
           .eq("brand_name", email.split("@")[0])
 
